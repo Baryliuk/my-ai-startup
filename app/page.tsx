@@ -1,5 +1,6 @@
 'use client';
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input";
 import Sidebar from "@/components/ui/Sidebar";
 import Header from "@/components/Header";
 import { useState } from "react";
@@ -18,9 +19,9 @@ export default function Home() {
       <Header></Header>
       <div className="flex">
         <Sidebar></Sidebar>
-        <div className="centered-content flex flex-col items-center justify-center flex-1 p-8 gap-5">
+        <div className="flex flex-col max-w-[320px] mx-auto items-center justify-center flex-1 p-8 gap-5">
           <h1 className="text-2xl font-bold">Мій AI Стартап 🚀</h1>
-         <input  type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Введіть ваше ім'я"></input>
+         <Input  type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Введіть ваше ім'я"></Input>
           <Button size="lg" onClick={validator}>
             Почати зараз
           </Button>
