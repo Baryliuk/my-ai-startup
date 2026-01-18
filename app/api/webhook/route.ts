@@ -37,21 +37,29 @@ bot.on("message:text", async (ctx) => {
   try {
     const userMessage = ctx.message.text;
 
-    // Виклик Gemini
-    // Використовуємо модель, яка у тебе запрацювала (2.0-flash)
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    // Спробуй змінити на gemini-1.5-flash, якщо 2.0-flash все ще глючить
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
     
     const prompt = `${SYSTEM_PROMPT}\n\nПитання клієнта: ${userMessage}`;
     
     const result = await model.generateContent(prompt);
-    const aiResponse = result.response.text();
+    
+    // ДОДАНО: Більш безпечне отримання тексту
+    const response = await result.response;
+    const aiResponse = response.text();
 
-    // Відповідь клієнту в Telegram
+    if (!aiResponse) {
+      await ctx.reply("Я не зміг знайти відповідь на це питання. Спробуйте ще раз.");
+      return;
+    }
+
     await ctx.reply(aiResponse);
 
-  } catch (error) {
-    console.error("Помилка Gemini в боті:", error);
-    await ctx.reply("Вибачте, сталась помилка при обробці запиту. Спробуйте пізніше.");
+  } catch (error: any) {
+    console.error("Повна помилка Gemini:", error);
+    
+    // Виводимо конкретну помилку в чат (тільки для тестування!)
+    await ctx.reply(`Помилка: ${error.message}`);
   }
 });
 
