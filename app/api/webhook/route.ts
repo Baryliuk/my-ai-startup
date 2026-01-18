@@ -1,11 +1,12 @@
 import { Bot, webhookCallback } from "grammy";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 // Ініціалізація токенів
 const token = process.env.TELEGRAM_BOT_TOKEN || "";
 const geminiKey = process.env.GEMINI_API_KEY || "";
+const adminId = process.env.ADMIN_ID || "";
 
 const bot = new Bot(token);
 const genAI = new GoogleGenerativeAI(geminiKey);
@@ -36,28 +37,50 @@ ${KNOWLEDGE_BASE}
 bot.on("message:text", async (ctx) => {
   try {
     const userMessage = ctx.message.text;
+    const userId = ctx.from.id;
+    const username = ctx.from.username || "Без юзернейму";
 
-    // Спробуй змінити на gemini-1.5-flash, якщо 2.0-flash все ще глючить
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-    
     const prompt = `${SYSTEM_PROMPT}\n\nПитання клієнта: ${userMessage}`;
-    
+
     const result = await model.generateContent(prompt);
-    
-    // ДОДАНО: Більш безпечне отримання тексту
+
     const response = await result.response;
     const aiResponse = response.text();
 
     if (!aiResponse) {
-      await ctx.reply("Я не зміг знайти відповідь на це питання. Спробуйте ще раз.");
+      await ctx.reply(
+        "Я не зміг знайти відповідь на це питання. Спробуйте ще раз.",
+      );
       return;
     }
 
     await ctx.reply(aiResponse);
 
+    const phoneRegex = /(?:\+?\d{1,3})?(?:[\s\-\(\)]?\d{2,4}){3,}/g;
+    const hasPhone = phoneRegex.test(userMessage);
+
+    if (
+      hasPhone ||
+      userMessage.toLowerCase().includes("замов") ||
+      userMessage.toLowerCase().includes("купити")
+    ) {
+      const notification = `
+      🔔 **Нова заявка!**
+      👤 Від: @${username} (ID: ${userId})
+      💬 Повідомлення: ${userMessage}
+      `;
+
+      // Надсилаємо сповіщення адміну
+      if (adminId) {
+        await bot.api.sendMessage(adminId, notification, {
+          parse_mode: "Markdown",
+        });
+      }
+    }
   } catch (error: any) {
     console.error("Повна помилка Gemini:", error);
-    
+
     // Виводимо конкретну помилку в чат (тільки для тестування!)
     await ctx.reply(`Помилка: ${error.message}`);
   }
@@ -66,7 +89,8 @@ bot.on("message:text", async (ctx) => {
 // --- ВЕБХУК ---
 export async function POST(req: Request) {
   if (!token) return new Response("Telegram Token missing", { status: 500 });
-  if (!geminiKey) return new Response("Gemini API Key missing", { status: 500 });
+  if (!geminiKey)
+    return new Response("Gemini API Key missing", { status: 500 });
 
   try {
     return await webhookCallback(bot, "std/http")(req);
