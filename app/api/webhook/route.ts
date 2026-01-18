@@ -33,7 +33,7 @@ bot.on("message:text", async (ctx) => {
     const username = ctx.from.username || "Без юзернейму";
 
     // Прямий запит до стабільної версії Gemini 1.5 Flash (v1)
-    const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${geminiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=${geminiKey}`;
 
     const aiRequest = await fetch(url, {
       method: "POST",
