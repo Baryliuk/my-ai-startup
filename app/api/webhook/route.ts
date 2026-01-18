@@ -2,11 +2,10 @@ import { Bot, webhookCallback } from "grammy";
 
 export const dynamic = "force-dynamic";
 
-// Ініціалізація змінних
 const token = process.env.TELEGRAM_BOT_TOKEN || "";
 const geminiKey = process.env.GEMINI_API_KEY || "";
-// Перетворюємо adminId у число для надійності
 const adminId = Number(process.env.ADMIN_ID);
+const sheetUrl = process.env.GOOGLE_SHEET_URL || "";
 
 const bot = new Bot(token);
 
@@ -32,7 +31,6 @@ bot.on("message:text", async (ctx) => {
     const userId = ctx.from.id;
     const username = ctx.from.username || "Без юзернейму";
 
-    // Запит до Gemini
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
 
     const aiRequest = await fetch(url, {
@@ -44,34 +42,33 @@ bot.on("message:text", async (ctx) => {
     });
 
     const data = await aiRequest.json();
-    if (!aiRequest.ok) throw new Error(data.error?.message || "Google API Error");
+    const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || "Помилка відповіді.";
 
-    const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || "Вибачте, я не можу зараз відповісти.";
-
-    // 1. Відповідь КЛІЄНТУ
+    // 1. Відповідь клієнту
     await ctx.reply(aiResponse);
 
-    // 2. ЛОГІКА ДЛЯ МЕНЕДЖЕРА
-    const phoneRegex = /(?:\+?\d{1,3})?(?:[\s\-\(\)]?\d{2,4}){3,}/g;
-    const hasPhone = phoneRegex.test(userMessage);
-    const isOrder = userMessage.toLowerCase().includes("замов") || userMessage.toLowerCase().includes("купити");
+    // 2. ЗАПИС В GOOGLE ТАБЛИЦЮ (ІСТОРІЯ)
+    if (sheetUrl) {
+      fetch(sheetUrl, {
+        method: "POST",
+        body: JSON.stringify({
+          userId,
+          username,
+          message: userMessage,
+          aiResponse
+        }),
+      }).catch(e => console.error("Sheet error:", e));
+    }
 
-    // Перевіряємо, чи є адмін і чи це НЕ сам адмін пише боту (щоб не було дублів при тестах)
-    if ((hasPhone || isOrder) && adminId) {
-      const notification = `🚀 **НОВЕ ЗАМОВЛЕННЯ!**\n\n👤 Клієнт: @${username}\n🆔 ID: ${userId}\n💬 Текст: ${userMessage}`;
-      
-      // Надсилаємо в окремий чат адміну
+    // 3. СПОВІЩЕННЯ АДМІНУ (ЗАМОВЛЕННЯ)
+    const phoneRegex = /(?:\+?\d{1,3})?(?:[\s\-\(\)]?\d{2,4}){3,}/g;
+    if ((phoneRegex.test(userMessage) || userMessage.toLowerCase().includes("замов")) && adminId) {
+      const notification = `🚀 **НОВА ЗАЯВКА!**\n\n👤 Клієнт: @${username}\n🆔 ID: ${userId}\n💬 Текст: ${userMessage}`;
       await bot.api.sendMessage(adminId, notification, { parse_mode: "Markdown" });
     }
 
   } catch (error: any) {
-    console.error("Помилка:", error);
-    // Якщо помилка квоти, відповідаємо спокійніше
-    if (error.message.includes("quota")) {
-        await ctx.reply("Дякую! Менеджер отримав ваше повідомлення і скоро зв'яжеться з вами.");
-    } else {
-        await ctx.reply(`Тимчасова помилка: ${error.message}`);
-    }
+    console.error(error);
   }
 });
 
