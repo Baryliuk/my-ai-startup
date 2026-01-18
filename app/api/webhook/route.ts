@@ -1,20 +1,73 @@
 import { Bot, webhookCallback } from "grammy";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 export const dynamic = 'force-dynamic';
 
+// Ініціалізація токенів
 const token = process.env.TELEGRAM_BOT_TOKEN || "";
-const bot = new Bot(token);
+const geminiKey = process.env.GEMINI_API_KEY || "";
 
-// Тимчасово прибираємо Gemini, щоб перевірити тільки Telegram
-bot.on("message", async (ctx) => {
-  await ctx.reply("Я працюю! Зв'язок із сервером є. Зараз підключимо мізки (AI).");
+const bot = new Bot(token);
+const genAI = new GoogleGenerativeAI(geminiKey);
+
+// --- НАЛАШТУВАННЯ БОТА ---
+const KNOWLEDGE_BASE = `
+КАТАЛОГ ТОВАРІВ МАГАЗИНУ:
+1. Кросівки "Air Max" — Розміри: 40, 41, 42, 43, 44, 45. Ціна: 3000 грн. Наявність: В наявності.
+2. Худі "Oversize" — Розміри: S, M, L. Колір: Чорний, Сірий. Ціна: 1200 грн. Наявність: Тільки розмір L.
+3. Кепка "Classic" — Колір: Синій. Ціна: 500 грн. Наявність: Тимчасово відсутня.
+`;
+
+const SYSTEM_PROMPT = `
+Ти — професійний AI-консультант компанії LeadMate. 
+Твоє завдання: допомагати клієнтам, відповідаючи на питання про товари з каталогу.
+
+ПРАВИЛА:
+1. Використовуй ТІЛЬКИ дані з каталогу нижче.
+2. Якщо товару немає в списку, ввічливо скажи, що зараз його немає.
+3. Якщо клієнт запитує про розмір, наявність або ціну — давай чітку відповідь.
+4. Якщо клієнт хоче замовити або купити — попроси його написати свій номер телефону, щоб менеджер зв'язався для оформлення.
+5. Відповідай коротко і ввічливо.
+
+${KNOWLEDGE_BASE}
+`;
+
+// --- ОБРОБКА ПОВІДОМЛЕНЬ ---
+bot.on("message:text", async (ctx) => {
+  try {
+    const userMessage = ctx.message.text;
+
+    // Виклик Gemini
+    // Використовуємо модель, яка у тебе запрацювала (2.0-flash)
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    
+    const prompt = `${SYSTEM_PROMPT}\n\nПитання клієнта: ${userMessage}`;
+    
+    const result = await model.generateContent(prompt);
+    const aiResponse = result.response.text();
+
+    // Відповідь клієнту в Telegram
+    await ctx.reply(aiResponse);
+
+  } catch (error) {
+    console.error("Помилка Gemini в боті:", error);
+    await ctx.reply("Вибачте, сталась помилка при обробці запиту. Спробуйте пізніше.");
+  }
 });
 
+// --- ВЕБХУК ---
 export async function POST(req: Request) {
-  if (!token) return new Response("Token missing", { status: 500 });
-  return await webhookCallback(bot, "std/http")(req);
+  if (!token) return new Response("Telegram Token missing", { status: 500 });
+  if (!geminiKey) return new Response("Gemini API Key missing", { status: 500 });
+
+  try {
+    return await webhookCallback(bot, "std/http")(req);
+  } catch (e) {
+    console.error("Webhook Error:", e);
+    return new Response("Error", { status: 500 });
+  }
 }
 
 export async function GET() {
-  return new Response("Бот онлайн");
+  return new Response("Бот LeadMate онлайн і готовий до роботи!");
 }
