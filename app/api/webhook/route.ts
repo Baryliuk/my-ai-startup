@@ -32,15 +32,20 @@ bot.on("message:text", async (ctx) => {
     const userId = ctx.from.id;
     const username = ctx.from.username || "Без юзернейму";
 
-    // Прямий запит до стабільної версії Gemini 1.5 Flash (v1)
-    const url = `https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=${geminiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`;
 
     const aiRequest = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: `${SYSTEM_PROMPT}\n\nПитання клієнта: ${userMessage}` }] }]
-      })
+        contents: [
+          {
+            parts: [
+              { text: `${SYSTEM_PROMPT}\n\nПитання клієнта: ${userMessage}` },
+            ],
+          },
+        ],
+      }),
     });
 
     const data = await aiRequest.json();
@@ -49,7 +54,9 @@ bot.on("message:text", async (ctx) => {
       throw new Error(data.error?.message || "Google API Error");
     }
 
-    const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || "Вибачте, я не можу зараз відповісти.";
+    const aiResponse =
+      data.candidates?.[0]?.content?.parts?.[0]?.text ||
+      "Вибачте, я не можу зараз відповісти.";
 
     // Відповідь клієнту
     await ctx.reply(aiResponse);
@@ -57,13 +64,16 @@ bot.on("message:text", async (ctx) => {
     // ЛОГІКА ДЛЯ АДМІНІСТРАТОРА
     const phoneRegex = /(?:\+?\d{1,3})?(?:[\s\-\(\)]?\d{2,4}){3,}/g;
     const hasPhone = phoneRegex.test(userMessage);
-    const isOrder = userMessage.toLowerCase().includes("замов") || userMessage.toLowerCase().includes("купити");
+    const isOrder =
+      userMessage.toLowerCase().includes("замов") ||
+      userMessage.toLowerCase().includes("купити");
 
     if ((hasPhone || isOrder) && adminId) {
       const notification = `🔔 **Нова заявка!**\n👤 Від: @${username} (ID: ${userId})\n💬 Текст: ${userMessage}`;
-      await bot.api.sendMessage(adminId, notification, { parse_mode: "Markdown" });
+      await bot.api.sendMessage(adminId, notification, {
+        parse_mode: "Markdown",
+      });
     }
-
   } catch (error: any) {
     console.error("Помилка:", error);
     await ctx.reply(`Тимчасова помилка сервісу: ${error.message}`);
