@@ -40,7 +40,7 @@ bot.on("message:text", async (ctx) => {
     const userId = ctx.from.id;
     const username = ctx.from.username || "Без юзернейму";
 
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
     const prompt = `${SYSTEM_PROMPT}\n\nПитання клієнта: ${userMessage}`;
 
     const result = await model.generateContent(prompt);
