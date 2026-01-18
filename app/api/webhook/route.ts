@@ -32,7 +32,8 @@ bot.on("message:text", async (ctx) => {
     const userId = ctx.from.id;
     const username = ctx.from.username || "Без юзернейму";
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`;
+   // Якщо варіант вище не спрацював, спробуй цей з новим ключем:
+const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
 
     const aiRequest = await fetch(url, {
       method: "POST",
